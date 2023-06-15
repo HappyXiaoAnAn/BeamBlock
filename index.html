@@ -143,7 +143,7 @@
             topo_H[i] = new Array(203);
         }
         const xhr = new XMLHttpRequest();
-        xhr.open('GET', '/topo.bin');
+        xhr.open('GET', './topo.bin');
         xhr.responseType = 'arraybuffer';
         xhr.onload = function() {
             const buffer = xhr.response;
