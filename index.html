@@ -26,7 +26,7 @@
 
     <script type='text/javascript'>
         var chart = document.getElementById("chart");
-        var ntimes = 1
+        // var ntimes = 1
         chart.width = 500;
         chart.height = 500;
         // 創建一個 Canvas 對象
@@ -51,34 +51,35 @@
     </script>
 
     <script type='text/javascript'>
-        const rearth = 6371
         function ray_casting(topo_H, vRadar, vCellSize, vMouse) {
             let bTileFound = false;
             let elev = 0.5;
             let hradar = topo_H[parseInt(vRadar.y/vCellSize.y)][parseInt(vRadar.x/vCellSize.x)] + 100;
-
+            // let hradar = topo_H[parseInt(vRadar.y)][parseInt(vRadar.x)] + 100;
+            
             let vRayEnd = {
                 x: vMouse.x * vCellSize.x,
                 y: vMouse.y * vCellSize.y
             };
             let vRayStart = Object.assign({},vRadar) // copy object
+            // let vRayStart = {x:vRadar.x/vCellSize.x, y:vRadar.x/vCellSize.y} // copy object
             let vMapCheck = {
                 x: parseInt(vRayStart.x/vCellSize.x),
                 y: parseInt(vRayStart.y/vCellSize.y)
             };
-
+            
             if (vRayEnd.x==vRayStart.x && vRayEnd.y==vRayStart.y) return null
-
+            
             let vRayDir = {
                 x: vRayEnd.x - vRayStart.x,
                 y: vRayEnd.y - vRayStart.y
             };
-
+            
             let vRayUnitStepSize = {
                 x: Math.sqrt(1+(vRayDir.y/vRayDir.x)**2) * vCellSize.x,
                 y: Math.sqrt(1+(vRayDir.x/vRayDir.y)**2) * vCellSize.y,
             };
-
+            
             // 初始化檢查方向跟距離
             let vStep = {};
             let vRayLength1D = {};
@@ -90,7 +91,7 @@
                 tmp = 1 - (vRayStart.x / vCellSize.x - parseFloat(vMapCheck.x));
             }
             vRayLength1D.x = (tmp==0) ? 0.0 : tmp * vRayUnitStepSize.x
-
+            
             if (vRayDir.y < 0.0) {
                 vStep.y = -1;
                 tmp = (vRayStart.y / vCellSize.y - parseFloat(vMapCheck.y));
@@ -99,12 +100,13 @@
                 tmp = 1 - (vRayStart.y / vCellSize.y - parseFloat(vMapCheck.y));
             }
             vRayLength1D.y = (tmp==0) ? 0.0 : tmp * vRayUnitStepSize.y
-
+            
             // Perform "Walk" until collision or range check
             let fMaxDistance = Math.sqrt((vRayEnd.x-vRayStart.x)**2+(vRayEnd.y-vRayStart.y)**2)
             let fDistance = 0.0
-
-            while (!bTileFound) {
+            let pHit = null;
+            
+            while (true) {
                 // Walk along shortest path
                 if (vRayLength1D.x < vRayLength1D.y) {
                     vMapCheck.x += vStep.x;
@@ -115,22 +117,33 @@
                     fDistance = vRayLength1D.y;
                     vRayLength1D.y += vRayUnitStepSize.y;
                 }
-
+                
                 // Test tile at new test point
                 if (fDistance > fMaxDistance) break;
-                let alpha = (elev + 90)*Math.PI/180
-                let beta = Math.PI/2 - fDistance/rearth - elev*Math.PI/180
-                let hh = (rearth*Math.sin(alpha)/Math.sin(beta)-rearth)*1000
+                const rearth = 6371000.0
+                
+                // METHOD 1.
                 // let hh = fDistance*1*Math.sin(elev*Math.PI/180)+hradar+100
+
+                // METHOD 2.
+                // let alpha = (elev + 90)*Math.PI/180
+                // let beta = Math.PI/2 - fDistance/rearth - elev*Math.PI/180
+                // let hh = (rearth*Math.sin(alpha)/Math.sin(beta)-rearth)
+
+                // METHOD 3.
+                let ae = rearth*4/3
+                let hh = ae*(Math.cos(elev*Math.PI/180)/Math.cos(elev*Math.PI/180+fDistance/ae)-1)
+
                 if (vMapCheck.x >= 0 && vMapCheck.x < vMapSize.x && vMapCheck.y >= 0 && vMapCheck.y < vMapSize.y) {
                     arr.push([hh,topo_H[vMapCheck.y][vMapCheck.x]]);
                     if (topo_H[vMapCheck.y][vMapCheck.x] >= hh) {
-                        // bTileFound = true;
+                        if (!bTileFound) pHit = Object.assign({},vMapCheck);
+                        bTileFound = true;
                         // return vMapCheck;
                     }
                 }
             }
-            return null;
+            return pHit;
             
         }
     </script>
@@ -209,11 +222,12 @@
                 }
             }
         };
-        var vRadar = {x:50,y:100};
-        function drawvRadar(vRadar={x:50,y:100}){
+        var vRadar = {x:50000,y:100000};
+        var vCellSize = {x:1000,y:1000}
+        function drawvRadar(vRadar={x:50,y:100},vCellSize={x:1,y:1}){
             ctx2.fillStyle = 'red'
             ctx2.beginPath();
-            ctx2.arc(vRadar.x*ntimes, vRadar.y*ntimes, 3, 0, 2*Math.PI);
+            ctx2.arc(vRadar.x/vCellSize.x*ntimes, vRadar.y/vCellSize.y*ntimes, 3, 0, 2*Math.PI);
             ctx2.closePath();
             ctx2.fill();
         }
@@ -224,19 +238,35 @@
         var ctx2 = canvas2.getContext('2d');
         ctx2.globalCompositeOperation = 'xor'
         // 顯示滑鼠位置數值
+        // canvas2.addEventListener("mousemove", function(event) {
+        //     var x = parseInt(event.offsetX/ntimes);
+        //     var y = parseInt(event.offsetY/ntimes);
+        //     document.getElementById("rgb").textContent = 'H: '+topo_H[y][x]+'m';
+            
+        //     ctx2.clearRect(0,0,canvas.width,canvas.height);
+        //     drawvRadar();
+        //     ctx2.beginPath();
+        //     ctx2.moveTo(vRadar.x/vCellSize.x*ntimes, vRadar.y/vCellSize.y*ntimes);
+        //     ctx2.lineTo(x*ntimes, y*ntimes);
+        //     ctx2.stroke();
+        //     arr = [];
+        //     let vMapCheck = ray_casting(topo_H, vRadar, vCellSize=vCellSize, vMouse={x:x,y:y})
+        //     if (vMapCheck!=null) {drawvRadar(vMapCheck);}
+        //     drawtopoline(arr);
+        // });
         canvas2.addEventListener("mousemove", function(event) {
-            var x = parseInt(event.offsetX/ntimes);
-            var y = parseInt(event.offsetY/ntimes);
-            document.getElementById("rgb").textContent = 'H: '+topo_H[y][x]+'m';
+            var x = event.offsetX;
+            var y = event.offsetY;
+            document.getElementById("rgb").textContent = 'H: '+ topo_H[parseInt(y/ntimes)][parseInt(x/ntimes)].toFixed(1) +'m';
             
             ctx2.clearRect(0,0,canvas.width,canvas.height);
             drawvRadar();
             ctx2.beginPath();
-            ctx2.moveTo(vRadar.x*ntimes, vRadar.y*ntimes);
+            ctx2.moveTo(vRadar.x/vCellSize.x*ntimes, vRadar.y/vCellSize.y*ntimes);
             ctx2.lineTo(x, y);
             ctx2.stroke();
             arr = [];
-            let vMapCheck = ray_casting(topo_H, vRadar, {x:1,y:1}, {x:x,y:y})
+            let vMapCheck = ray_casting(topo_H, vRadar, vCellSize=vCellSize, vMouse={x:x/ntimes,y:y/ntimes})
             if (vMapCheck!=null) {drawvRadar(vMapCheck);}
             drawtopoline(arr);
         });
